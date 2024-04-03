@@ -1,0 +1,55 @@
+import arcpy
+import random
+
+# Set up workspace
+workspace = r"C:\path\to\your\workspace"
+arcpy.env.workspace = workspace
+arcpy.env.overwriteOutput = True
+
+# List all feature classes in the workspace
+feature_classes = arcpy.ListFeatureClasses()
+
+# Define input datasets
+boundary_polygon = feature_classes[0]
+
+# Generate random points within the boundary polygon
+random_points = []
+for _ in range(30):
+    x = random.uniform(arcpy.Describe(boundary_polygon).extent.XMin, arcpy.Describe(boundary_polygon).extent.XMax)
+    y = random.uniform(arcpy.Describe(boundary_polygon).extent.YMin, arcpy.Describe(boundary_polygon).extent.YMax)
+    random_points.append((x, y))
+
+# Create point feature class to store random points
+random_points_fc = "random_points.shp"
+arcpy.management.CreateFeatureclass(arcpy.env.workspace, random_points_fc, "POINT", spatial_reference=boundary_polygon)
+
+# Insert random points into the feature class
+with arcpy.da.InsertCursor(random_points_fc, ['SHAPE@XY']) as cursor:
+    for point in random_points:
+        cursor.insertRow([point])
+
+# Assign random values to the points
+arcpy.AddField_management(random_points_fc, "VALUE", "LONG")
+with arcpy.da.UpdateCursor(random_points_fc, ['VALUE']) as cursor:
+    for row in cursor:
+        row[0] = random.randint(1, 200)
+        cursor.updateRow(row)
+
+# Execute EBKRegressionPrediction
+arcpy.ga.EmpiricalBayesianKriging(
+    in_features="random_points",
+    z_field="VALUE",
+    out_ga_layer=None,
+    out_raster=r"C:\path\to\your\workspace\EBK_TEST.tif",
+    cell_size=8.05761156119406,
+    transformation_type="NONE",
+    max_local_points=100,
+    overlap_factor=1,
+    number_semivariograms=100,
+    search_neighborhood="NBRTYPE=StandardCircular RADIUS=829.206035206375 ANGLE=0 NBR_MAX=15 NBR_MIN=10 SECTOR_TYPE=ONE_SECTOR",
+    output_type="PREDICTION",
+    quantile_value=0.5,
+    threshold_type="EXCEED",
+    probability_threshold=None,
+    semivariogram_model_type="POWER"
+)
